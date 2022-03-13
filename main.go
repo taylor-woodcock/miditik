@@ -20,6 +20,8 @@ const (
 	BeepDuration = 10
 	// BendDivision determines the total diference in bend before we send another command
 	BendDivision = 700
+	// BendZero determines the pitchbend zero position
+	BendZero = 8192
 	// Driver determines the MIDI driver we're using
 	Driver = Midicat
 	// Host determines the SSH connection address
@@ -60,17 +62,17 @@ const (
 
 // Midi defines a midi message
 type Midi struct {
-	channel   int
-	key       int
-	action    Action
-	velocity  int
-	frequency float64
-	value     int
+	action   Action
+	channel  int
+	key      int
+	velocity int
+	value    int
 }
 
 func main() {
 	fmt.Printf("Connecting to ssh: %s\n", Host)
 
+	// connect to SSH host
 	client, err := ssh.DialWithPasswd(Host, User, Pass)
 	if err != nil {
 		must(err)
@@ -83,7 +85,7 @@ func main() {
 	fmt.Println("Connection successful!")
 
 	var pressedKeys []int
-	bend := BendDefault
+	bend := BendZero
 	var bendDif float64
 	midiMap := calculateMidiFrequencies(0, 255)
 	beeper, err := NewMikroTikBeeper(client, midiMap)
