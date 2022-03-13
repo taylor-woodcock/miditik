@@ -15,18 +15,27 @@ import (
 )
 
 const (
-	// BeepDuration is the duration we wish to beep for by default
+	// TODO Replace with cobra CLI flags
+	// BeepDuration determines the max duration each beep plays for in seconds
 	BeepDuration = 10
 	// BendDivision determines the total diference in bend before we send another command
 	BendDivision = 700
+	// Driver determines the MIDI driver we're using
+	Driver = Midicat
+	// Host determines the SSH connection address
+	Host = "192.168.88.1:22"
+	// User determines the SSH username
+	User = "admin"
+	// Pass determines the SSH password
+	Pass = ""
 )
 
 // Driver defines a midi driver name
-type Driver string
+type MidiDriver string
 
 const (
-	Test    Driver = "test"
-	Midicat Driver = "midicat"
+	Test    MidiDriver = "test"
+	Midicat MidiDriver = "midicat"
 )
 
 // MessageKey defines the keys of each midi message
@@ -60,13 +69,9 @@ type Midi struct {
 }
 
 func main() {
-	driver := Midicat
-	host := "192.168.88.1:22"
-	usr := "admin"
-	pwd := ""
-	fmt.Printf("Connecting to ssh: %s\n", host)
+	fmt.Printf("Connecting to ssh: %s\n", Host)
 
-	client, err := ssh.DialWithPasswd(host, usr, pwd)
+	client, err := ssh.DialWithPasswd(Host, User, Pass)
 	if err != nil {
 		must(err)
 	}
@@ -78,17 +83,17 @@ func main() {
 	fmt.Println("Connection successful!")
 
 	var pressedKeys []int
-	bend := 8192
+	bend := BendDefault
 	var bendDif float64
 	midiMap := calculateMidiFrequencies(0, 255)
 	beeper, err := NewMikroTikBeeper(client, midiMap)
 	// randomBeeps(beeper, midiMap)
 
-	fmt.Printf("Connecting to midi using: %s\n", driver)
+	fmt.Printf("Connecting to midi using: %s\n", Driver)
 
 	// select driver
 	var drv midi.Driver
-	switch driver {
+	switch Driver {
 	case Test:
 		drv = testdrv.New("MidiTik")
 	case Midicat:
