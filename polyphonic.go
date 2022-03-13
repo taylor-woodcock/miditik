@@ -4,6 +4,15 @@ import (
 	"fmt"
 )
 
+// TODO (TW) Implement polyphonic beeper that can distribute beeps
+// And move this into main Beeper chain
+// beepers := map[Beeper]bool{
+// 	mikrotikBeeper: false,
+// }
+
+// polyphonicBeeper, err := NewPolyphonicBeeper(beepers, midiMap)
+// must
+
 // PolyphonicBeeper implements Beeper using multiple sources
 type PolyphonicBeeper struct {
 	beepers map[Beeper]bool
