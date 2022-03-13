@@ -16,15 +16,13 @@ const (
 
 // MikroTikBeeper implements Beeper using MikroTik router source
 type MikroTikBeeper struct {
-	client  *ssh.Client
-	midiMap map[int]float64
+	client *ssh.Client
 }
 
 // NewMikroTikBeeper creates a MikroTik-backed Beeper
-func NewMikroTikBeeper(client *ssh.Client, midiMap map[int]float64) (Beeper, error) {
+func NewMikroTikBeeper(client *ssh.Client) (Beeper, error) {
 	b := &MikroTikBeeper{
-		client:  client,
-		midiMap: midiMap,
+		client: client,
 	}
 
 	return b, nil
