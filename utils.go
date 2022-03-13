@@ -14,17 +14,21 @@ func decodeMidi(msg midi.Message) (*Midi, error) {
 	parts := strings.Split(msg.String(), " ")
 	fmt.Printf("Parts: %#v\n", parts)
 
-	var channel string
-	var key string
-	var value string
-	action := parts[0]
-	midi := &Midi{}
+	var (
+		channel  string
+		key      string
+		value    string
+		velocity string
+		action   = parts[0]
+		midi     = &Midi{}
+	)
 
 	switch action {
 	case "channel.NoteOn":
 		midi.action = NoteOn
 		channel = parts[2]
 		key = parts[4]
+		velocity = parts[6]
 	case "channel.NoteOff":
 		midi.action = NoteOff
 		channel = parts[2]
@@ -50,6 +54,14 @@ func decodeMidi(msg midi.Message) (*Midi, error) {
 			return nil, fmt.Errorf("could not parse key int: %v", err)
 		}
 		midi.key = int(pKey)
+	}
+
+	if velocity != "" {
+		pVelocity, err := strconv.ParseInt(velocity, 0, 32)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse velocity int: %v", err)
+		}
+		midi.velocity = int(pVelocity)
 	}
 
 	if value != "" {
