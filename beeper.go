@@ -3,16 +3,16 @@ package main
 import (
 	"fmt"
 	"math"
+	"time"
 
 	ssh "github.com/helloyi/go-sshclient"
 )
 
 const (
-	InitBeepFrequency  = 100
-	InitBeepDuration   = 1
 	ClearBeepFrequency = 20
 	ClearBeepDuration  = 0.001
 	BendMultiplier     = 1.0
+	BendDefault        = 8192
 )
 
 // Beeper defines a beepable device
@@ -29,15 +29,30 @@ type MikroTikBeeper struct {
 
 // NewMikroTikBeeper creates a MikroTik-backed Beeper
 func NewMikroTikBeeper(client *ssh.Client, midiMap map[int]float64) (Beeper, error) {
-	err := beep(client, InitBeepFrequency, InitBeepDuration)
-	if err != nil {
-		return nil, err
-	}
-
-	return &MikroTikBeeper{
+	b := &MikroTikBeeper{
 		client:  client,
 		midiMap: midiMap,
-	}, nil
+	}
+
+	b.InitSound()
+
+	return b, nil
+}
+
+// InitSound plays a sound on Initialisation
+func (b *MikroTikBeeper) InitSound() error {
+	b.Beep(60, BendDefault)
+	time.Sleep(time.Millisecond * 100)
+
+	b.Beep(64, BendDefault)
+	time.Sleep(time.Millisecond * 100)
+
+	b.Beep(67, BendDefault)
+	time.Sleep(time.Millisecond * 500)
+
+	b.NoBeep()
+
+	return nil
 }
 
 // Beep calculates the frequency and runs a beep command on the host
