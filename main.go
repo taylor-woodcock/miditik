@@ -2,24 +2,32 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"os/signal"
-	"sort"
 
 	ssh "github.com/helloyi/go-sshclient"
 	"gitlab.com/gomidi/midi"
 	"gitlab.com/gomidi/midi/reader"
+
 	testdrv "gitlab.com/gomidi/midi/testdrv"
 	midicat "gitlab.com/gomidi/midicatdrv"
+	// rtmididrv "gitlab.com/gomidi/rtmididrv"
+	// portmididrv "gitlab.com/gomidi/portmididrv"
+	// webmididrv "gitlab.com/gomidi/webmididrv"
 )
 
+// TODO Replace all vars/consts with cobra CLI flags
+
+// InitSequence determines the sequence that will be played on init
+var InitSequence [][]int = TripleBeepFunky
+
 const (
-	// TODO Replace with cobra CLI flags
+	// PlayInit determines whether InitSequence will be played
+	PlayInit = true
 	// BeepDuration determines the max duration each beep plays for in seconds
 	BeepDuration = 10
 	// BendDivision determines the total diference in bend before we send another command
-	BendDivision = 700
+	BendDivision = 1024
 	// BendZero determines the pitchbend zero position
 	BendZero = 8192
 	// Driver determines the MIDI driver we're using
@@ -36,8 +44,11 @@ const (
 type MidiDriver string
 
 const (
-	Test    MidiDriver = "test"
-	Midicat MidiDriver = "midicat"
+	Test     MidiDriver = "test"
+	Midicat  MidiDriver = "midicat"
+	RTMidi   MidiDriver = "rtmidi"
+	PortMidi MidiDriver = "portmididrv"
+	WebMidi  MidiDriver = "webmididrv"
 )
 
 // MessageKey defines the keys of each midi message
@@ -72,7 +83,6 @@ type Midi struct {
 func main() {
 	fmt.Printf("Connecting to ssh: %s\n", Host)
 
-	// connect to SSH host
 	client, err := ssh.DialWithPasswd(Host, User, Pass)
 	if err != nil {
 		must(err)
@@ -84,28 +94,39 @@ func main() {
 
 	fmt.Println("Connection successful!")
 
-	var pressedKeys []int
-	bend := BendZero
-	var bendDif float64
-	midiMap := calculateMidiFrequencies(0, 255)
-	beeper, err := NewMikroTikBeeper(client, midiMap)
-	// randomBeeps(beeper, midiMap)
+	mikrotikBeeper, err := NewMikroTikBeeper(client)
+	must(err)
+
+	limitedBeeper, err := NewLimitedBeeper(mikrotikBeeper, BendDivision)
+	must(err)
+
+	beeper, err := NewMidiBeeper(limitedBeeper)
+	must(err)
+
+	defer func() {
+		fmt.Println("Closing beeper")
+		beeper.NoBeep(-1)
+	}()
 
 	fmt.Printf("Connecting to midi using: %s\n", Driver)
 
-	// select driver
 	var drv midi.Driver
 	switch Driver {
 	case Test:
 		drv = testdrv.New("MidiTik")
 	case Midicat:
 		drv, err = midicat.New()
+	// case RTMidi:
+	// 	drv, err = rtmididrv.New()
+	// case PortMidi:
+	// 	drv, err = portmididrv.New()
+	// case WebMidi:
+	// 	drv, err = webmididrv.New()
 	default:
 		err = fmt.Errorf("invalid midi driver")
 	}
 	must(err)
 
-	// ensure driver is closed
 	defer func() {
 		fmt.Println("Closing midi driver")
 		drv.Close()
@@ -129,51 +150,25 @@ func main() {
 		out.Close()
 	}()
 
+	bend := BendZero
+
 	rd := reader.New(
 		reader.NoLogger(),
 		reader.Each(func(pos *reader.Position, msg midi.Message) {
-			fmt.Printf("Processing midi: %s\n", msg.String())
-
 			midi, err := decodeMidi(msg)
 			if err != nil {
 				fmt.Printf("failed to deocde midi: %v\n", err)
 				return
 			}
 
-			fmt.Printf("Got midi: %#v\n", midi)
-
 			switch midi.action {
 			case NoteOn:
-				pressedKeys = append(pressedKeys, midi.key)
-				sort.Ints(pressedKeys)
-				last := pressedKeys[len(pressedKeys)-1]
-
-				if midi.key == last {
-					// beep highest key
-					err = beeper.Beep(last, bend)
-				}
+				err = beeper.Beep(midi.key, bend)
 			case NoteOff:
-				sort.Ints(pressedKeys)
-				pressedKeys, _ = remove(pressedKeys, midi.key)
-
-				if len(pressedKeys) > 0 {
-					err = beeper.Beep(pressedKeys[len(pressedKeys)-1], bend)
-				} else {
-					err = beeper.NoBeep()
-				}
+				err = beeper.NoBeep(midi.key)
 			case Pitchbend:
-				bendDif += math.Abs(float64(bend - midi.value))
 				bend = midi.value
-
-				fmt.Printf("BendDif: %f\n", bendDif)
-
-				if len(pressedKeys) > 0 && bendDif >= BendDivision {
-					err = beeper.Beep(pressedKeys[len(pressedKeys)-1], bend)
-				}
-
-				if bendDif >= BendDivision {
-					bendDif = 0
-				}
+				err = beeper.Beep(midi.key, bend)
 			default:
 				err = fmt.Errorf("invalid action: %v", midi.action)
 			}
@@ -183,16 +178,18 @@ func main() {
 		}),
 	)
 
-	// listen for midi
 	err = rd.ListenTo(in)
 	must(err)
 
+	if PlayInit {
+		playSequence(beeper, InitSequence[0], InitSequence[1])
+		// randomBeeps(beeper, midiMap)
+	}
+
 	fmt.Println("Connection successful!")
 
-	// system interrupts
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
-	// await interrupt and exit
 	<-signalChan
 }
