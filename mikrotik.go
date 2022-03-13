@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"time"
 
 	ssh "github.com/helloyi/go-sshclient"
 )
@@ -28,43 +27,32 @@ func NewMikroTikBeeper(client *ssh.Client, midiMap map[int]float64) (Beeper, err
 		midiMap: midiMap,
 	}
 
-	b.InitSound()
-
 	return b, nil
 }
 
-// InitSound plays a sound on Initialisation
-func (b *MikroTikBeeper) InitSound() error {
-	b.Beep(60, BendZero)
-	time.Sleep(time.Millisecond * 100)
-
-	b.Beep(64, BendZero)
-	time.Sleep(time.Millisecond * 100)
-
-	b.Beep(67, BendZero)
-	time.Sleep(time.Millisecond * 500)
-
-	b.NoBeep()
-
-	return nil
-}
-
 // Beep calculates the frequency and runs a beep command on the host
+//
+// https://dsp.stackexchange.com/questions/1645/converting-a-pitch-bend-midi-value-to-a-normal-pitch-value
 func (b *MikroTikBeeper) Beep(keyIndex int, bend int) error {
-	fmt.Printf("Beep: (key: %d, bend: %d)\n", keyIndex, bend)
+	fmt.Printf("MikroTikBeeper: Beep: (key: %d, bend: %d) - Frequency: ", keyIndex, bend)
+
 	frequency := math.Pow(2, ((float64(keyIndex)-69)/12.0)+((float64(bend)-8192)/(4096*12))) * 440
+
+	fmt.Println(frequency)
+
 	return beep(b.client, frequency, BeepDuration)
 }
 
 // NoBeep runs a clearing beep command to stop the beeping
-func (b *MikroTikBeeper) NoBeep() error {
-	fmt.Println("NoBeep")
+func (b *MikroTikBeeper) NoBeep(keyIndex int) error {
+	fmt.Println("MikroTikBeeper: NoBeep")
+
 	return beep(b.client, NoBeepFrequency, NoBeepDuration)
 }
 
 // beep runs a beep command with a defined frequency and duration on the client
 func beep(client *ssh.Client, frequency float64, duration float64) error {
 	cmd := fmt.Sprintf("beep frequency=%f length=%f", frequency, duration)
-	fmt.Printf("Cmd: %s\n", cmd)
+
 	return client.Cmd(cmd).Run()
 }
