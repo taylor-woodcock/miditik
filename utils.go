@@ -104,7 +104,6 @@ func playSequence(b Beeper, seqNotes []int, seqTimes []int) error {
 		if n == 0 {
 			// TODO (TW) protect against first val being 0
 			b.NoBeep(seqNotes[i-1])
-			return nil
 		}
 		err := b.Beep(n, BendZero)
 		if err != nil {
